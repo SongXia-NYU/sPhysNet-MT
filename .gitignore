@@ -1,0 +1,8 @@
+/config.txt
+/exp*_run_*
+/exp*_test_*
+__pycache__
+/slurm*
+/*_run_*-*-*_*
+/debug
+/pretrained_models
