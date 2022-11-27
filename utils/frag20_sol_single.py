@@ -54,7 +54,7 @@ def sdf_from_sample_id(sample_id, geometry):
 
     try:
         source = int(source)
-        this_sdf = f"/ext3/Frag20_{source}_data/{idx}{extra}.sdf"
+        this_sdf = f"{RAW_DATA_ROOT}/Frag20_sdfs/Frag20_{source}_data/{idx}{extra}.sdf"
     except ValueError:
         assert source in ["PubChem", "Zinc", "CCDC"]
         if source in ["PubChem", "Zinc"]:
