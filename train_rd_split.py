@@ -22,7 +22,7 @@ def main():
     args["folder_prefix"] = f"{root}/{folder_prefix}"
 
     for i in range(args["n_runs"]):
-        split = get_rd_split(len(data_provider), **args)
+        split = get_rd_split(len(data_provider), ds=data_provider, **args)
         if args["n_ens"] == 1:
             train(args, explicit_split=split, data_provider=data_provider)
         else:
@@ -38,7 +38,7 @@ def main():
 
 
 def get_rd_split(size, split, explicit_train_size=None, freeopen_special=False, freeopen_special_better=False,
-                 freeopen_special_1=False, **kwargs):
+                 freeopen_special_1=False, ds=None, **kwargs):
     if freeopen_special or freeopen_special_better or freeopen_special_1:
         assert split == "811"
         real_size = size
@@ -47,6 +47,7 @@ def get_rd_split(size, split, explicit_train_size=None, freeopen_special=False, 
         # use the rest for training
         size = 639
 
+    index_array = np.arange(size)
     # 80/10/10 split
     if split == "811":
         test_size = size // 10
@@ -54,9 +55,16 @@ def get_rd_split(size, split, explicit_train_size=None, freeopen_special=False, 
     elif split == "openchem_logP":
         test_size = size // 5
         valid_size = 1000
+    elif split == "pretrain":
+        test_size = 10_000
+        valid_size = 10_000
+        # there are two bad points in the pretraining ds for some reason
+        # here I removed the through index
+        # so we do not want to sample them during random split
+        index_array = torch.concat([ds.train_index, ds.val_index, ds.test_index])
     else:
         raise ValueError(f"Invalid split: {split}")
-    index_array = np.arange(size)
+
     train_valid_split, test_split = train_test_split(index_array, test_size=test_size)
     train_split, valid_split = train_test_split(train_valid_split, test_size=valid_size)
     split = {
