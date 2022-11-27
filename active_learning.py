@@ -838,7 +838,7 @@ def main():
                         help="Selection threshold, note it is in eV for ensemble models")
     parser.add_argument("--n_ensemble", default=5, type=int)
 
-    parser.add_argument("--magic_i", default=None, help="Do not use it, temp variable for personal use.", type=int)
+    parser.add_argument("--magic_i", default=None, help="Do not use it, temp variable for temp fix.", type=int)
 
     parser.add_argument("--sample_rd", action="store_true")
     args = vars(parser.parse_args())

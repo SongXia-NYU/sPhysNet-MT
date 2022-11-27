@@ -14,6 +14,23 @@ from utils.DataPrepareUtils import my_pre_transform
 from utils.sdf2pyg_single import sdf2pyg_single
 
 hartree2ev = Hartree / eV
+# relative to the "sPhysNet-MT" directory since the code will be executed there
+# you can also use absolute path if you are confused
+RAW_DATA_ROOT = "./data/raw/Frag20_sdfs"
+# TODO: remove this line after finishing debugging
+if osp.exists("/vast/sx801/sPhysNet-MT-data/raw"):
+    RAW_DATA_ROOT = "/vast/sx801/sPhysNet-MT-data/raw"
+# temp data for data preprocessing
+TEMP_DATA_ROOT = osp.join(RAW_DATA_ROOT, "..", "tmp")
+PROCESSED_DATA_ROOT = osp.join(RAW_DATA_ROOT, "..", "processed")
+os.makedirs(TEMP_DATA_ROOT, exist_ok=True)
+os.makedirs(PROCESSED_DATA_ROOT, exist_ok=True)
+
+def get_debug_arg():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true")
+    args = parser.parse_args()
+    return args
 
 
 def frag20_csd20_sol_single(sample_id, csv, geometry, out_path, df=None):
@@ -41,13 +58,13 @@ def sdf_from_sample_id(sample_id, geometry):
     except ValueError:
         assert source in ["PubChem", "Zinc", "CCDC"]
         if source in ["PubChem", "Zinc"]:
-            this_sdf = f"/ext3/Frag20_9_data/{source.lower()}/{idx}{extra}.sdf"
+            this_sdf = f"{RAW_DATA_ROOT}/Frag20_sdfs/Frag20_9_data/{source.lower()}/{idx}{extra}.sdf"
         else:
             if geometry == "qm":
                 extra = ".opt"
             else:
                 extra = "_min"
-            this_sdf = f"/ext3/CSD20_sol/cry_min/{idx}{extra}.sdf"
+            this_sdf = f"{RAW_DATA_ROOT}/CSD20_sdfs/cry_min/{idx}{extra}.sdf"
     return this_sdf
 
 

@@ -10,7 +10,6 @@ import torch
 from ase.units import Hartree, eV
 from rdkit.Chem import SDMolSupplier, MolToSmiles, MolFromMolFile
 from tqdm import tqdm
-from mendeleev import get_all_elements
 
 
 def read_log(software):

@@ -22,7 +22,7 @@ def merge_runs(root, exp_id, test):
         shutil.rmtree(f)
 
     if test:
-        from generate_test_al import generate_test_al
+        from deprecated_code.generate_test_al import generate_test_al
         generate_test_al(str_id=str(exp_id))
 
 

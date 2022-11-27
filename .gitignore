@@ -1,5 +1,6 @@
 /config.txt
 /exp*_run_*
+/exp*_RDrun_*
 /exp*_test_*
 __pycache__
 /slurm*

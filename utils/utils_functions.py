@@ -937,6 +937,15 @@ def validate_index(train_index, val_index, test_index):
 
     return train_size, val_size, test_size
 
+def solv_num_workers():
+    try:
+        n_cpu_avail = len(os.sched_getaffinity(0))
+    except AttributeError:
+        n_cpu_avail = None
+    n_cpu = os.cpu_count()
+    num_workers = n_cpu_avail if n_cpu_avail is not None else n_cpu
+    return n_cpu_avail, n_cpu, num_workers
+
 
 if __name__ == '__main__':
     dummy_input = torch.rand(32, 160).double().cuda()

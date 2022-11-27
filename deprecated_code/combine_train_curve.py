@@ -2,7 +2,7 @@ import os.path as osp
 
 import torch
 
-from scripts.training_curve import print_training_curve
+from deprecated_code.training_curve import print_training_curve
 from utils.utils_functions import get_device
 
 

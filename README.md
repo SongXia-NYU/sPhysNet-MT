@@ -29,16 +29,32 @@ WIP...
 
 ### 1. Dataset preprocess
 
-The following script will download the raw geometry(SDF) files and labels from [our website](https://yzhang.hpc.nyu.edu/IMA/). The downloaded data will be stored in `./data/raw`
+Download the raw data (labels and geometry files) from [our website](https://yzhang.hpc.nyu.edu/IMA/). The downloaded data will be stored in `./data/raw`
 
 `bash bash_scripts/download_data_and_extract.bash`
 
 ### 2. Train sPhysNet-MT on the calculated dataset (Frag20-solv-678k)
 
-The following script allows you to train a sPhysNet-MT from scratch. It is recommended to use 30GB memory to train on Frag20-solv-678k.
+Train a sPhysNet-MT from scratch. It is recommended to use 30GB memory to train on Frag20-solv-678k.
 
 `bash bash_scripts/train_from_config.bash configs/config-frag20sol.txt`
 
-This script allows you to fine-tune the pretrained model on FreeSolv-PHYSPROP-14k.
+Train a ensemble of 5 models from scratch on the calculated dataset.
 
+`bash bash_scripts/train_ens_from_config.bash configs/config-frag20sol.txt`
 
+### 2. Train sPhysNet-MT on the experimental dataset (FreeSolv-PHYSPROP-14k)
+
+Fine-tune the pretrained model on FreeSolv-PHYSPROP-14k using 50 random splits and 5 ensembles.
+
+`bash bash_scripts/train_rd_split_from_config.bash configs/config-freesolv_physprop.txt`
+
+## Model Evaluation
+
+After training, you will find the trained folder in the current directory: `./exp_*_run_*` (single run), `./exp_*_active_ALL_*` (ensemble) or `./exp_*_RDrun_*` (random split). Those folders contain all the information about the model training as well as the model with the lowest evaluation loss. To evaluate the performance on the test set:
+
+`bash bash_scripts/test.bash $TRAINED_FOLDER`
+
+Replace `$TRAINED_FOLDER` with the folder path you actually get, for example:
+
+`bash bash_scripts/test.bash exp_frag20sol_run_2022-11-26_205046__623751`

@@ -10,10 +10,82 @@ from torch_geometric.data import Data
 from tqdm import tqdm
 import os.path as osp
 
-from utils.DummyIMDataset import DummyIMDataset
-from utils.utils_functions import cal_edge
-
 hartree2ev = Hartree / eV
+
+_force_cpu = False
+
+
+def set_force_cpu():
+    """
+    ONLY use it when pre-processing data
+    :return:
+    """
+    global _force_cpu
+    _force_cpu = True
+
+
+def get_device():
+    # we use a function to get device for proper distributed training behaviour
+    if _force_cpu:
+        return torch.device("cpu")
+    return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+def _get_index_from_matrix(num, previous_num):
+    """
+    get the fully-connect graph edge index compatible with torch_geometric message passing module
+    eg: when num = 3, will return:
+    [[0, 0, 0, 1, 1, 1, 2, 2, 2]
+    [0, 1, 2, 0, 1, 2, 0, 1, 2]]
+    :param num:
+    :param previous_num: the result will be added previous_num to fit the batch
+    :return:
+    """
+    index = torch.LongTensor(2, num * num).to(get_device())
+    index[0, :] = torch.cat([torch.zeros(num).long().fill_(i) for i in range(num)], dim=0)
+    index[1, :] = torch.cat([torch.arange(num).long() for __ in range(num)], dim=0)
+    mask = (index[0, :] != index[1, :])
+    return index[:, mask] + previous_num
+
+
+def cal_edge(R, N, prev_N, edge_index, cal_coulomb=True, short_range=True):
+    """
+    calculate edge distance from edge_index;
+    if cal_coulomb is True, additional edge will be calculated without any restriction
+    :param short_range:
+    :param cal_coulomb:
+    :param prev_N:
+    :param edge_index:
+    :param R:
+    :param N:
+    :return:
+    """
+    if cal_coulomb:
+        '''
+        IMPORTANT: DO NOT use num(tensor) itself as input, which will be regarded as dictionary key in this function,
+        use int value(num.item())
+        Using tensor as dictionary key will cause unexpected problem, for example, memory leak
+        '''
+        coulomb_index = torch.cat(
+            [_get_index_from_matrix(num.item(), previous_num) for num, previous_num in zip(N, prev_N)], dim=-1)
+        points1 = R[coulomb_index[0, :], :]
+        points2 = R[coulomb_index[1, :], :]
+        coulomb_dist = torch.sum((points1 - points2) ** 2, keepdim=True, dim=-1)
+        coulomb_dist = torch.sqrt(coulomb_dist)
+
+    else:
+        coulomb_dist = None
+        coulomb_index = None
+
+    if short_range:
+        short_range_index = edge_index
+        points1 = R[edge_index[0, :], :]
+        points2 = R[edge_index[1, :], :]
+        short_range_dist = torch.sum((points1 - points2) ** 2, keepdim=True, dim=-1)
+        short_range_dist = torch.sqrt(short_range_dist)
+    else:
+        short_range_dist, short_range_index = None, None
+    return coulomb_dist, coulomb_index, short_range_dist, short_range_index
 
 
 def scale_R(R):
@@ -140,6 +212,8 @@ def extend_bond(edge_index):
     extended_bond = extended_bond[:, source_index != target_index]
     extended_bond = remove_bonding_edge(extended_bond, edge_index)
     result = torch.cat([edge_index, extended_bond], dim=-1)
+
+    result = torch.unique(result, dim=1)
     return result
 
 
@@ -150,7 +224,7 @@ def my_pre_transform(data, edge_version, do_sort_edge, cal_efg, cutoff, boundary
     atom_edge_index is non-bonding edge idx_name when bond_atom_sep=True; Otherwise, it is bonding and non-bonding together
     """
     edge_index = torch.zeros(2, 0).long()
-    dist, full_edge, _, _ = cal_edge(data.R, [data.N], [0], edge_index, cal_coulomb=True)
+    dist, full_edge, _, _ = cal_edge(data.R, [data.N], [0], edge_index, cal_coulomb=True, short_range=False)
     dist = dist.cpu()
     full_edge = full_edge.cpu()
 
@@ -189,14 +263,22 @@ def my_pre_transform(data, edge_version, do_sort_edge, cal_efg, cutoff, boundary
                 data.Z))
             return None
         B_edge_index = mol_to_edge_index(mol)
-        if B_edge_index.max() + 1 > data.N:
+        if B_edge_index.numel() > 0 and B_edge_index.max() + 1 > data.N:
             raise ValueError('problematic mol file: {}'.format(mol))
-        if extended_bond:
+        if B_edge_index.numel() > 0 and extended_bond:
             B_edge_index = extend_bond(B_edge_index)
-        if do_sort_edge:
+        if B_edge_index.numel() > 0 and do_sort_edge:
             B_edge_index = sort_edge(B_edge_index)
         data.B_edge_index = B_edge_index
-        data.N_edge_index = remove_bonding_edge(data.BN_edge_index, B_edge_index)
+        try:
+            data.N_edge_index = remove_bonding_edge(data.BN_edge_index, B_edge_index)
+        except Exception as e:
+            print("*"*40)
+            print("BN: ", data.BN_edge_index)
+            print("B: ", data.B_edge_index)
+            from rdkit.Chem import MolToSmiles
+            print("SMILES: ", MolToSmiles(mol))
+            raise e
         _edge_list = []
         for bond_type in type_3_body:
             _edge_list.append(getattr(data, bond_type + "_edge_index"))
@@ -329,8 +411,8 @@ def physnet_to_datalist(self, N, R, E, D, Q, Z, num_mol, mols, efgs_batch, EFG_R
     return data_list
 
 
-def rm_atom(atom_z, dataset, remove_split=('train', 'valid', 'test'), explicit_split=None,
-            return_mask=False):
+def remove_atom_from_dataset(atom_z, dataset, remove_split=('train', 'valid', 'test'), explicit_split=None,
+                             return_mask=False):
     """
     remove a specific atom from dataset
     H: 1
@@ -377,6 +459,7 @@ def rm_atom(atom_z, dataset, remove_split=('train', 'valid', 'test'), explicit_s
 
 
 def concat_im_datasets(root: str, datasets: List[str], out_name: str, splits: List[str]):
+    from DummyIMDataset import DummyIMDataset
     data_list = []
     prev_dataset_size = 0
     concat_split = {

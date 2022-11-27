@@ -1,3 +1,6 @@
+--n_runs=50
+--n_ens=5
+--freeopen_special_1
 --debug_mode=False
 --modules=P-noOut P-noOut P
 --bonding_type=BN BN BN
@@ -11,25 +14,26 @@
 --n_phys_interaction_res=1
 --n_phys_output_res=1
 --n_bi_linear=8
---num_epochs=1000
+--num_epochs=100
 --warm_up_steps=0
---data_provider=dummy[dataset_name=frag20-ultimate-sol-mmff-04182022.pyg,split=frag20-ultimate-sol-split-mmff-04182022.pyg]
+--data_provider=dummy[dataset_name=freesolv_openchem_aux_05022022.pyg]
 --test_interval=-1
---learning_rate=0.001
+--learning_rate=0.0003
 --ema_decay=0.999
+--optimizer=emaAms_0.999
 --l2lambda=0.0
 --nh_lambda=0.01
 --restrain_non_bond_pred=True
 --decay_steps=620000
 --decay_rate=0.1
---batch_size=512
---valid_batch_size=512
+--batch_size=128
+--valid_batch_size=128
 --force_weight=0
 --charge_weight=1
 --dipole_weight=1
---use_trained_model=False
+--use_trained_model=exp_frag20sol_012_active_ALL_2022-05-01_112820/exp*
 --reset_output_layers=False
---reset_optimizer=False
+--reset_optimizer=True
 --max_norm=1000.0
 --log_file_name=training.log
 --normalize=True
@@ -40,9 +44,11 @@
 --target_names=gasEnergy
 --target_names=watEnergy
 --target_names=octEnergy
+--keep=waterSol
 --auto_sol=True
+--flex_sol
 --n_output=3
---scheduler=ReduceLROnPlateau[factor=0.3,patience=20]
---comment=Training on the calculated dataset
+--scheduler=StepLR[decay_epochs=80]
+--comment=Finetuning on the experimental dataset, 50 random splits, ensemble of 5
 --boundary_factor=100.
---folder_prefix=exp_frag20sol
+--folder_prefix=exp_freesolv_physprop
