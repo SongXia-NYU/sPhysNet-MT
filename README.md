@@ -73,6 +73,8 @@ Replace `$SINGLE_RUN_FOLDER` with the folder path you actually get, for example:
 
 `bash bash_scripts/test.bash exp_frag20sol_run_2022-11-26_205046__623751`
 
+You will find a test folder `exp_*_test_*` generated inside the run folder. Inside the test folder you will find a log file `test.log`, two `loss_*.pt` file which contains the raw predictions by the model. The `*.pt` files can be read by `torch.load()`.
+
 To evaluate the performance on an ensemble run folder:
 
 `bash bash_scripts/test.bash $ENSEMBLE_RUN_FOLDER/exp*`
