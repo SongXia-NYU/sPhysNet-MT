@@ -12,7 +12,7 @@ CSD20_TEMPLATE = "csd20-sol-{}.pyg"
 CONF20_TEMPLATE = "conf20-sol-{}.pyg"
 
 RETAIN_KEYS = ["CalcSol", "CalcOct", "calcLogP", "watOct", "gasEnergy", "watEnergy", "octEnergy", "R", "Z", "N", "split",
-               "BN_edge_index", "L_edge_index", "num_L_edge", "num_BN_edge", "sample_id", "dataset_name"]
+               "BN_edge_index", "num_BN_edge", "sample_id", "dataset_name"]
 RETAIN_KEYS = set(RETAIN_KEYS)
 
 
@@ -99,7 +99,7 @@ def prepare_frag20_sol_678k():
         torch.save(dict(split), osp.join(PROCESSED_DATA_ROOT, f"frag20-sol-678k-{geometry}-split.pyg"))
         for key in split.keys():
             print(f"{key} size: {len(split[key])}")
-        print("Frag2-solv-678k preprocessing complete!")
+        print("Frag20-solv-678k preprocessing complete!")
 
 
 def concat_frag20():

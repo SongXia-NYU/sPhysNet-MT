@@ -8,7 +8,7 @@ from datetime import datetime
 
 import torch
 
-from DataPrepareUtils import my_pre_transform
+from utils.DataPrepareUtils import my_pre_transform
 from Networks.PhysDimeNet import PhysDimeNet
 from Networks.UncertaintyLayers.swag import SWAG
 from train import data_provider_solver, _add_arg_from_config, remove_extra_keys
