@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export PYTHONPATH=.
+export PYTHONPATH=.:$PYTHONPATH
 python scripts/frag20_sol_all.py
 python scripts/csd20_sol_all.py
 python scripts/conf20_sol_all.py
