@@ -31,7 +31,7 @@ Download the trained models:
 
 `bash bash_scripts/download_models_and_extract.bash`
 
-Run prediction requires a SDF file which contains the 3D geometry of the molecule. For example, to predict the experimental hydration free energy and logP of aspirin:
+The script requires a SDF file which contains the 3D geometry of the molecule. For example, to predict the experimental hydration free energy and logP of aspirin:
 
 `python predict.py --sdf data/aspirin.mmff.sdf --model exp_ens5`
 
