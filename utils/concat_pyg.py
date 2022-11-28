@@ -5,6 +5,7 @@ import os
 import os.path as osp
 import time
 import traceback
+from tqdm import tqdm
 
 import pandas as pd
 import torch
@@ -12,7 +13,7 @@ import torch_geometric.data
 
 
 def concat_pyg(pygs: list = None, save_pyg: str = None, data_list=None, save_split=None, extend_load=False,
-               ref_csv=None, all_train=False, all_test=False, **kwargs):
+               ref_csv=None, all_train=False, all_test=False, del_keys=None, **kwargs):
     train_index = []
     test_index = []
 
@@ -25,7 +26,7 @@ def concat_pyg(pygs: list = None, save_pyg: str = None, data_list=None, save_spl
     t0 = time.time()
     if data_list is None:
         data_list = []
-        for pyg in pygs:
+        for pyg in tqdm(pygs, desc="loading data into memory"):
             try:
                 d = torch.load(pyg)
 
@@ -38,6 +39,10 @@ def concat_pyg(pygs: list = None, save_pyg: str = None, data_list=None, save_spl
                                 setattr(_d, key, this_info[key].item())
                         else:
                             setattr(d, key, this_info[key].item())
+                
+                if del_keys is not None:
+                    for key in del_keys:
+                        delattr(d, key)
 
                 if extend_load:
                     data_list.extend(d)

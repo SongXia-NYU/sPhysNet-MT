@@ -105,17 +105,21 @@ def prepare_frag20_sol_678k():
 def concat_frag20():
     for geometry in ["mmff"]:
         pygs = glob(f"{TEMP_DATA_ROOT}/frag20/{geometry}/*.pyg")
-        concat_pyg(pygs, osp.join(PROCESSED_DATA_ROOT, f"frag20-sol-{geometry}.pyg"), use_mp=False)
+
+        concat_pyg(pygs, osp.join(PROCESSED_DATA_ROOT, f"frag20-sol-{geometry}.pyg"), use_mp=False,
+         del_keys=["QM_SMILES", "QM_InChI", "ID", "SourceFile", "L_edge_index", "num_L_edge"])
 
 def concat_csd20():
     for geometry in ["mmff"]:
         pygs = glob(f"{TEMP_DATA_ROOT}/csd20/{geometry}/*.pyg")
-        concat_pyg(pygs, osp.join(PROCESSED_DATA_ROOT, f"csd20-sol-{geometry}.pyg"), use_mp=False)
+        concat_pyg(pygs, osp.join(PROCESSED_DATA_ROOT, f"csd20-sol-{geometry}.pyg"), use_mp=False,
+         del_keys=["QM_SMILES", "QM_InChI", "ID", "SourceFile", "L_edge_index", "num_L_edge"])
 
 def concat_conf20():
     for geometry in ["mmff"]:
         pygs = glob(f"{TEMP_DATA_ROOT}/conf20/{geometry}/*.pyg")
-        concat_pyg(pygs, osp.join(PROCESSED_DATA_ROOT, f"conf20-sol-{geometry}.pyg"), use_mp=False)
+        concat_pyg(pygs, osp.join(PROCESSED_DATA_ROOT, f"conf20-sol-{geometry}.pyg"), use_mp=False,
+         del_keys=["water_smiles", "gas_smiles", "1-octanol_smiles", "L_edge_index", "num_L_edge"])
 
 if __name__ == "__main__":
     concat_frag20()
