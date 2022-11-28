@@ -107,10 +107,6 @@ class PhysDimeNet(nn.Module):
         self.uni_task_ss = uni_task_ss
         self.loss_metric = loss_metric
         self.pooling = pooling
-        print("------unused keys in model-----")
-        for key in kwargs:
-            print("{}: {}".format(key, kwargs[key]))
-        print(">>>>>>>>unused keys in model<<<<<<<<<<")
 
         self.logger = logging.getLogger()
         self.requires_atom_prop = requires_atom_prop

@@ -84,7 +84,7 @@ class TrainedFolder:
 
             inferred_prefix = self.folder_name.split('_run_')[0]
             if _args["folder_prefix"] != inferred_prefix:
-                print('overwriting folder {} ----> {}'.format(_args["folder_prefix"], inferred_prefix))
+                # print('overwriting folder {} ----> {}'.format(_args["folder_prefix"], inferred_prefix))
                 _args["folder_prefix"] = inferred_prefix
             _args["requires_atom_prop"] = True
 
