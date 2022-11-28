@@ -3,6 +3,7 @@ from collections import defaultdict
 import torch
 from torch_geometric.data import Data
 from glob import glob
+import numpy as np
 
 from utils.gauss.read_gauss_log import Gauss16Log
 from utils.DataPrepareUtils import my_pre_transform
@@ -65,9 +66,9 @@ class EnsPredictor:
         self.single_predictors = [SinglePredictor(f, sdf_file) for f in self.trained_folders]
 
     def display_prediction(self, keys):
-        prediction = self.get_prediction()
+        prediction, std = self.get_prediction()
         for key in keys:
-            print(f"{key}: {prediction[key]} {display_unit_mapper[key]}")
+            print(f"{key}: {prediction[key]} +- {std[key]} {display_unit_mapper[key]}")
     
     def get_prediction(self):
         # avoid recalculation of the data
@@ -76,13 +77,17 @@ class EnsPredictor:
 
         predictions = [predictor.get_prediction() for predictor in self.single_predictors]
         ens_prediciton = defaultdict(lambda: 0.)
+        ens_std = defaultdict(lambda: [])
 
         for pred in predictions:
             for key in pred.keys():
                 ens_prediciton[key] += pred[key]
+                ens_std[key].append(pred[key])
         for key in ens_prediciton.keys():
             ens_prediciton[key] /= len(predictions)
-        return ens_prediciton
+        for key in ens_std.keys():
+            ens_std[key] = np.std(np.asarray(ens_std[key])).item()
+        return ens_prediciton, ens_std
 
 def predict():
     parser = argparse.ArgumentParser()

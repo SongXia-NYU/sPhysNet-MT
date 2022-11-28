@@ -27,7 +27,21 @@ Install the required packages:
 
 ## Run Prediction
 
-WIP...
+Download the trained models:
+
+`bash bash_scripts/download_models_and_extract.bash`
+
+Run prediction requires a SDF file which contains the 3D geometry of the molecule. For example, to predict the experimental hydration free energy and logP of aspirin:
+
+`python predict.py --sdf data/aspirin.mmff.sdf --model exp_ens5`
+
+You can provide your own sdf file. Since our model are trained on MMFF optimized geometry with explicit hydrogens, we recommend adding hydrogens and performing MMFF optimization before the prediction.
+
+There are three model options:
+
+- `cal_single`: a single model trained on Frag20-solv-678k which predicts the DFT-level energies in gas, water and octanol
+- `cal_ens5`: an ensemble of 5 models trained on Frag20-solv-678k which predicts the DFT-level energies in gas, water and octanol
+- `exp_ens5`: am ensemble of 5 models finetuned on FreeSolv-PHYSPROP-14k which predicts experimental level hydration free energy and logP
 
 ## Model Training
 

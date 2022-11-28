@@ -8,4 +8,7 @@ __pycache__
 /debug
 /pretrained_models
 /results
-/data
+/data/models
+/data/raw
+/data/tmp
+/data/processed
