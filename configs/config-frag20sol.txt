@@ -13,7 +13,8 @@
 --n_bi_linear=8
 --num_epochs=1000
 --warm_up_steps=0
---data_provider=dummy[dataset_name=frag20-ultimate-sol-mmff-04182022.pyg,split=frag20-ultimate-sol-split-mmff-04182022.pyg]
+--data_root=./data
+--data_provider=dummy[dataset_name=frag20-sol-678k-mmff.pyg,split=frag20-sol-678k-mmff-split.pyg]
 --test_interval=-1
 --learning_rate=0.001
 --ema_decay=0.999

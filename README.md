@@ -2,18 +2,22 @@
 ![](figures/toc.png)
 
 ## Environment Setup
-1. If you are using Linux and Conda
 
-    Create a new conda environment with python 3.8:
+### 1. If you are using Linux and Conda
 
-    `conda create -n sphysnet-mt python==3.8 -y`
+Create a new conda environment with python 3.8:
 
-    `conda activate sphysnet-mt`
+`conda create -n sphysnet-mt python==3.8 -y`
 
-    Install the required packages:
+`conda activate sphysnet-mt`
 
-    `bash bash_scripts/install_env_linux.bash`
-2. If you are on other systems or are using other package managers, please install the following packages:
+Install the required packages:
+
+`bash bash_scripts/install_env_linux.bash`
+
+### 2. If you are on other systems or are using other package managers
+
+ please install the following packages by checking their websites.
 
 - [PyTorch](https://pytorch.org/)
 - [PyTorch geometric](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
@@ -59,10 +63,20 @@ Fine-tune the pretrained model on FreeSolv-PHYSPROP-14k using 50 random splits a
 
 ## Model Evaluation
 
-After training, you will find the trained folder in the current directory: `./exp_*_run_*` (single run), `./exp_*_active_ALL_*` (ensemble) or `./exp_*_RDrun_*` (random split). Those folders contain all the information about the model training as well as the model with the lowest evaluation loss. To evaluate the performance on the test set:
+After training, you will find the trained folder in the current directory: `./exp_*_run_*` (single run), `./exp_*_active_ALL_*` (ensemble) or `./exp_*_RDrun_*` (random split). Those folders contain all the information about the model training as well as the model with the lowest evaluation loss. 
 
-`bash bash_scripts/test.bash $TRAINED_FOLDER`
+To evaluate the performance on a single run folder:
 
-Replace `$TRAINED_FOLDER` with the folder path you actually get, for example:
+`bash bash_scripts/test.bash $SINGLE_RUN_FOLDER`
+
+Replace `$SINGLE_RUN_FOLDER` with the folder path you actually get, for example:
 
 `bash bash_scripts/test.bash exp_frag20sol_run_2022-11-26_205046__623751`
+
+To evaluate the performance on an ensemble run folder:
+
+`bash bash_scripts/test.bash $ENSEMBLE_RUN_FOLDER/exp*`
+
+To evaluate the performance on a random split run folder:
+
+`bash bash_scripts/test.bash $RANDOM_SPLIT_RUN_FOLDER/exp*/exp*`

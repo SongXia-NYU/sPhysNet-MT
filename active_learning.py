@@ -166,9 +166,8 @@ class ALTrainer:
         if chk is not None:
             self.load_chk()
         else:
-            while True:
-                prefix = self.args["folder_prefix"]
-                self.al_folder = non_collapsing_folder(prefix, "_active_ALL_")
+            prefix = self.args["folder_prefix"]
+            self.al_folder = non_collapsing_folder(prefix, "_active_ALL_")
 
         self.prefix = osp.basename(self.args["folder_prefix"])
 

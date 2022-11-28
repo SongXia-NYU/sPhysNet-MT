@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 from Networks.PhysDimeNet import PhysDimeNet
 from Networks.UncertaintyLayers.swag import SWAG
-from utils.DataPrepareUtils import my_pre_transform, rm_atom
+from utils.DataPrepareUtils import my_pre_transform
 from utils.DummyIMDataset import DummyIMDataset
 from utils.LossFn import LossFn
 from utils.Optimizers import EmaAmsGrad, MySGD
@@ -534,10 +534,6 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
     if get_device().type == 'cuda':
         logger.info('Hello from device : ' + torch.cuda.get_device_name(get_device()))
         logger.info("Cuda mem allocated: {:.2f} MB".format(torch.cuda.memory_allocated(get_device()) * 1e-6))
-    else:
-        if not config_dict["debug_mode"]:
-            assert not osp.exists("/scratch/sx801"), "You are running on HPC but not using a GPU"
-            assert not osp.exists("/archive/sx801"), "You are running on HPC but not using a GPU"
 
     if is_main:
         with open(meta_data_name, 'w+') as f:

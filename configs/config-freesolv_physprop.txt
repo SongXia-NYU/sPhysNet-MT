@@ -16,7 +16,8 @@
 --n_bi_linear=8
 --num_epochs=100
 --warm_up_steps=0
---data_provider=dummy[dataset_name=freesolv_openchem_aux_05022022.pyg]
+--data_root=./data
+--data_provider=dummy[dataset_name=freesolv_physprop_14k.pyg]
 --test_interval=-1
 --learning_rate=0.0003
 --ema_decay=0.999
@@ -31,7 +32,7 @@
 --force_weight=0
 --charge_weight=1
 --dipole_weight=1
---use_trained_model=exp_frag20sol_012_active_ALL_2022-05-01_112820/exp*
+--use_trained_model=./data/models/exp_frag20sol_012_active_ALL_2022-05-01_112820/exp*
 --reset_output_layers=False
 --reset_optimizer=True
 --max_norm=1000.0
