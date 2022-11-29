@@ -368,9 +368,7 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
     else:
         loader_kw_args = {"shuffle": True, "batch_size": config_dict["batch_size"]}
         if config_dict["over_sample"]:
-            assert not config_dict["dynamic_batch"]
-
-            has_solv_mask = data_provider.mask[torch.as_tensor(train_index), 3]
+            has_solv_mask = data_provider.data.mask[torch.as_tensor(train_index), 3]
             n_total = has_solv_mask.shape[0]
             n_has_wat_solv = has_solv_mask.sum().item()
             n_no_wat_solv = n_total - n_has_wat_solv

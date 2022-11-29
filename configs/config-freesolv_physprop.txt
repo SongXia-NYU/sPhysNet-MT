@@ -1,6 +1,7 @@
 --n_runs=50
 --n_ens=5
 --freeopen_special_1
+--over_sample
 --debug_mode=False
 --modules=P-noOut P-noOut P
 --bonding_type=BN BN BN

@@ -1,4 +1,8 @@
 #!/bin/bash
-mkdir -p ./data/raw
-cd ./data/raw
 
+# mkdir -p ./data
+cd ./data
+
+wget https://yzhang.hpc.nyu.edu/IMA/Datasets/sPhysNet-MT-datasets.tar.gz
+
+tar xvf sPhysNet-MT-datasets.tar.gz

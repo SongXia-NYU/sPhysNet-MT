@@ -3,6 +3,9 @@
 mkdir -p ./data/models
 cd ./data/models
 
+wget https://yzhang.hpc.nyu.edu/IMA/Datasets/sPhysNet-MT_cal_trained_models.tar.gz
+wget https://yzhang.hpc.nyu.edu/IMA/Datasets/sPhysNet-MT_exp_trained_models.tar.gz
+
 tar xvf cal_trained_models.tar.gz
 
 ## extract models trained on the experimental dataset. Since 50 random splits are trained, we only extract the first split for demostration
