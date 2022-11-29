@@ -17,6 +17,7 @@ import torch
 import torch.cuda
 import torch.distributed as dist
 import torch.utils.data
+from torch.utils.data import WeightedRandomSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_geometric.data import InMemoryDataset
 from tqdm import tqdm
@@ -365,10 +366,26 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
             data_provider[torch.as_tensor(train_index)], shuffle=True)
         loader_kw_args = {"sampler": train_sampler}
     else:
-        loader_kw_args = {"shuffle": True}
+        loader_kw_args = {"shuffle": True, "batch_size": config_dict["batch_size"]}
+        if config_dict["over_sample"]:
+            assert not config_dict["dynamic_batch"]
+
+            has_solv_mask = data_provider.mask[torch.as_tensor(train_index), 3]
+            n_total = has_solv_mask.shape[0]
+            n_has_wat_solv = has_solv_mask.sum().item()
+            n_no_wat_solv = n_total - n_has_wat_solv
+            logger.info(f"Oversampling: {n_total} molecules are in the training set")
+            logger.info(f"Oversampling: {n_has_wat_solv} molecules has water solv")
+            logger.info(f"Oversampling: {n_no_wat_solv} molecules do not have water solv")
+            weights = torch.zeros_like(has_solv_mask).float()
+            weights[has_solv_mask] = n_no_wat_solv
+            weights[~has_solv_mask] = n_has_wat_solv
+            sampler = WeightedRandomSampler(weights=weights, num_samples=n_total)
+            loader_kw_args["sampler"] = sampler
+            loader_kw_args["shuffle"] = False
+
     train_data_loader = torch.utils.data.DataLoader(
-        data_provider[torch.as_tensor(train_index)], batch_size=config_dict["batch_size"], collate_fn=collate_fn,
-        pin_memory=True, num_workers=num_workers, **loader_kw_args)
+        data_provider[torch.as_tensor(train_index)], collate_fn=collate_fn, pin_memory=True, num_workers=num_workers, **loader_kw_args)
 
     val_data_loader = torch.utils.data.DataLoader(
         data_provider[torch.as_tensor(val_index)], batch_size=config_dict["valid_batch_size"], collate_fn=collate_fn,

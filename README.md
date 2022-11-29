@@ -41,13 +41,13 @@ There are three model options:
 
 - `cal_single`: a single model trained on Frag20-solv-678k which predicts the DFT-level energies in gas, water and octanol
 - `cal_ens5`: an ensemble of 5 models trained on Frag20-solv-678k which predicts the DFT-level energies in gas, water and octanol
-- `exp_ens5`: am ensemble of 5 models finetuned on FreeSolv-PHYSPROP-14k which predicts experimental level hydration free energy and logP
+- `exp_ens5`: an ensemble of 5 models finetuned on FreeSolv-PHYSPROP-14k which predicts experimental level hydration free energy and logP
 
 ## Model Training
 
 ### 1. Dataset preprocess
 
-Download the raw data (labels and geometry files) from [our website](https://yzhang.hpc.nyu.edu/IMA/). The downloaded data will be stored in `./data/raw`
+This script downloads the raw data (labels and geometry files) from [our website](https://yzhang.hpc.nyu.edu/IMA/). The downloaded data will be stored in `./data/raw`
 
 `bash bash_scripts/download_data_and_extract.bash`
 

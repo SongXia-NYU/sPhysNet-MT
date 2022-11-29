@@ -823,6 +823,7 @@ def add_parser_arguments(parser):
     parser.add_argument("--ext_atom_features", type=str, default=None)
     parser.add_argument("--flex_sol", action="store_true",
                         help="Multi-task FT on experimental datasets: use MT when available, otherwise use st")
+    parser.add_argument("--over_sample", action="store_true")
     return parser
 
 
