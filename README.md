@@ -51,11 +51,11 @@ Download the raw data (labels and geometry files) from [our website](https://yzh
 
 `bash bash_scripts/download_data_and_extract.bash`
 
-Preprocess the calculated dataset (Frag20-solv-678k). The following command takes around ??? hours with 12 CPUs and 30GB of memory.
+Preprocess the calculated dataset (Frag20-solv-678k). This step takes around 4 hours on 12 CPUs and 35GB of memory.
 
 `bash bash_scripts/preprocess_frag20_678k.bash`
 
-Preprocess the experimental dataset (FreeSolv-PHYSPROP-14k). The following command takes around 6 minutes with 2 CPUs.
+Preprocess the experimental dataset (FreeSolv-PHYSPROP-14k). This step takes around 6 minutes on 2 CPUs.
 
 `bash bash_scripts/preprocess_freesolv_physprop.bash`
 
