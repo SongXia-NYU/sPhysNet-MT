@@ -2,9 +2,9 @@
 #
 #SBATCH --job-name=preprocess
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=12
 #SBATCH --time=18:00:00
-#SBATCH --mem=50GB
+#SBATCH --mem=35GB
 #SBATCH --mail-type=END,FAIL,TIME_LIMIT
 #SBATCH --mail-user=songxia23@gmail.com
 

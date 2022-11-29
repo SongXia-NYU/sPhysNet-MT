@@ -4,14 +4,14 @@ import os.path as osp
 import torch
 
 from utils.concat_pyg import concat_pyg
-from utils.frag20_sol_single import PROCESSED_DATA_ROOT, TEMP_DATA_ROOT
+from utils.frag20_sol_single import PROCESSED_DATA_ROOT, TEMP_DATA_ROOT, RAW_DATA_ROOT
 
 
 FRAG_TEMPLATE = "frag20-sol-{}.pyg"
 CSD20_TEMPLATE = "csd20-sol-{}.pyg"
 CONF20_TEMPLATE = "conf20-sol-{}.pyg"
 
-RETAIN_KEYS = ["CalcSol", "CalcOct", "calcLogP", "watOct", "gasEnergy", "watEnergy", "octEnergy", "R", "Z", "N", "split",
+RETAIN_KEYS = ["CalcSol", "CalcOct", "calcLogP", "watOct", "gasEnergy", "watEnergy", "octEnergy", "R", "Z", "N",
                "BN_edge_index", "num_BN_edge", "sample_id", "dataset_name"]
 RETAIN_KEYS = set(RETAIN_KEYS)
 
@@ -27,8 +27,9 @@ def _process_dataset(data, slices, name):
         # _rename("water_gas(kcal/mol)", "CalcSol")
         # _rename("1-octanol_gas(kcal/mol)", "CalcOct")
         # _rename("water_1-octanol(kcal/mol)", "watOct")
-        data.split = ["train"]*length
-        slices["split"] = slices["N"]
+        # data.split = ["train"]*length
+        # slices["split"] = slices["N"]
+        pass
     else:
         _rename("FileHandle", "sample_id")
 
@@ -56,7 +57,7 @@ def prepare_frag20_sol_678k():
 
         for key in RETAIN_KEYS:
             print(f"processing key: {key}")
-            is_list = (key in ["sample_id", "dataset_name", "split"])
+            is_list = (key in ["sample_id", "dataset_name"])
             this_frag20_val = getattr(frag20_data, key)
             this_csd20_val = getattr(csd20_data, key)
             this_conf20_val = getattr(conf20_data, key)
@@ -91,11 +92,15 @@ def prepare_frag20_sol_678k():
 
         torch.save((out_data, out_slices),
                    osp.join(PROCESSED_DATA_ROOT, f"frag20-sol-678k-{geometry}.pyg"))
+
+        explicit_split = torch.load(osp.join(RAW_DATA_ROOT, "frag20-solv-678k-split.pth"))
         split = defaultdict(lambda: [])
-        for i, split_name in enumerate(out_data.split):
-            if split_name == "neither":
-                split_name = "train"
-            split[f"{split_name}_index"].append(i)
+        for i, sample_id in enumerate(out_data.sample_id):
+            for split_name in explicit_split.keys():
+                if sample_id in explicit_split[split_name]:
+                    split[split_name].append(i)
+                    continue
+                
         torch.save(dict(split), osp.join(PROCESSED_DATA_ROOT, f"frag20-sol-678k-{geometry}-split.pyg"))
         for key in split.keys():
             print(f"{key} size: {len(split[key])}")

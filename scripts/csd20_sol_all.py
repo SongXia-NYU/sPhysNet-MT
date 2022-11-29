@@ -23,7 +23,7 @@ def csd20_sol_single_wrapper(args):
 def csd20_sol_all():
     args = get_debug_arg()
     
-    df = pd.read_csv(f"{RAW_DATA_ROOT}/frag20_solvation_with_split_fl.csv")
+    df = pd.read_csv(f"{RAW_DATA_ROOT}/frag20_solvation_with_fl.csv")
     df = df[df["SourceFile"] == "CCDC"]
 
     print("splitting dfs...")

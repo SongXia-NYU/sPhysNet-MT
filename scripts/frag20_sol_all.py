@@ -24,7 +24,8 @@ def frag20_sol_single_wrapper(df):
 def frag20_sol_all():
     args = get_debug_arg()
 
-    df = pd.read_csv(f"{RAW_DATA_ROOT}/frag20_solvation_with_split_fl.csv")
+    df = pd.read_csv(f"{RAW_DATA_ROOT}/frag20_solvation_with_fl.csv")
+    df = df[df["SourceFile"] != "CCDC"]
 
     print("splitting dfs...")
     if args.debug:
