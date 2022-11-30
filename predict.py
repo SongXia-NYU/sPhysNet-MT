@@ -76,6 +76,8 @@ class EnsPredictor:
             predictor._data = self.single_predictors[0].data
 
         predictions = [predictor.get_prediction() for predictor in self.single_predictors]
+        if len(predictions) == 0:
+            raise ValueError("Trained model not successfully downloaded. Please make sure 'bash bash_scripts/download_models_and_extract.bash' has finished successfully.")
         ens_prediciton = defaultdict(lambda: 0.)
         ens_std = defaultdict(lambda: [])
 
