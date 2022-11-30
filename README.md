@@ -35,6 +35,12 @@ The script requires a SDF file which contains the 3D geometry of the molecule. F
 
 `python predict.py --sdf data/aspirin.mmff.sdf --model exp_ens5`
 
+
+```
+E_hydration: -8.706545270452128 +- 0.07050703507346 kcal/mol
+LogP: 0.9404807601870087 +- 0.1834077032423927
+```
+
 You can provide your own sdf file. Since our model are trained on MMFF optimized geometry with explicit hydrogens, we recommend adding hydrogens and performing MMFF optimization before the prediction.
 
 There are three model options:
