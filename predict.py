@@ -8,7 +8,7 @@ import numpy as np
 from utils.gauss.read_gauss_log import Gauss16Log
 from utils.DataPrepareUtils import my_pre_transform
 from utils.trained_folder import TrainedFolder
-from utils.utils_functions import kcal2ev
+from utils.utils_functions import get_device, kcal2ev
 from utils.LossFn import logP_to_watOct
 
 display_unit_mapper = {
@@ -45,7 +45,7 @@ class SinglePredictor(TrainedFolder):
         return self._data
 
     def get_prediction(self):
-        model_out = self.model(self.data)
+        model_out = self.model(self.data.to(get_device()))
         mol_prop = model_out["mol_prop"].detach().cpu().numpy().reshape(-1)
         e_gas = mol_prop[0]
         e_water = mol_prop[1]
