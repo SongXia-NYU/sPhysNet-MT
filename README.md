@@ -1,4 +1,6 @@
 # Multi-task Deep Ensemble Prediction of Molecular Energetics in Solution: From Quantum Mechanics to Experimental Properties
+
+This is the official implementation of the [paper](https://pubs.acs.org/doi/full/10.1021/acs.jctc.2c01024) published in JCTC.
 ![](figures/toc.png)
 
 ## Environment Setup
