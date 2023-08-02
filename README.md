@@ -65,7 +65,7 @@ Preprocess the calculated dataset (Frag20-solv-678k). This step takes around 4 h
 
 Preprocess the experimental dataset (FreeSolv-PHYSPROP-14k). This step takes around 6 minutes on 2 CPUs.
 
-`bash bash_scripts/preprocess_freesolv_physprop.bash`
+`bash bash_scripts/preprocess_freesolv_physprop_14k.bash`
 
 ### 2. Train sPhysNet-MT on the calculated dataset (Frag20-solv-678k)
 
