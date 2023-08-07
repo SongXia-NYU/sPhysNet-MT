@@ -1,6 +1,7 @@
 from glob import glob
 import os
 import os.path as osp
+from typing import Set
 from tqdm.contrib.concurrent import process_map
 
 from utils.frag20_sol_single import RAW_DATA_ROOT, TEMP_DATA_ROOT, PROCESSED_DATA_ROOT
@@ -56,14 +57,14 @@ def mask_mt_pyg_gen():
     pyg_aux = osp.join(PROCESSED_DATA_ROOT, "freesolv_physprop_14k.pyg")
 
     intersection_df = pd.read_csv(intersection_csv, dtype={"sample_id_1": int, "sample_id_2": int})
-    ids_1 = set(intersection_df["sample_id_1"].values.tolist())
-    ids_2 = set(intersection_df["sample_id_2"].values.tolist())
+    freesolv_id_intetersection: Set[int] = set(intersection_df["sample_id_1"].values.tolist())
+    physprop_id_intersection: Set[int] = set(intersection_df["sample_id_2"].values.tolist())
 
     def _load_csv(csv):
         df = pd.read_csv(csv).rename({"FileHandle": "sample_id", "Kow": "activity"}, axis=1)
         return df.astype({"sample_id": int}).set_index("sample_id")
-    df1 = _load_csv(freesolv_csv)
-    df2 = _load_csv(physprop_csv)
+    freesolv_df = _load_csv(freesolv_csv)
+    physprop_df = _load_csv(physprop_csv)
 
     data_list = []
 
@@ -73,15 +74,18 @@ def mask_mt_pyg_gen():
             pyg = torch.load(pyg_f)
 
             sample_id = int(osp.basename(pyg_f).split(".")[0])
-            if sample_id in ids_1:
+            if sample_id in freesolv_id_intetersection:
                 for key in PROPS:
                     setattr(pyg, key, torch.as_tensor([intersection_df.loc[sample_id][key]]))
+                # fix an error in intersection.csv that CalcOct is missing a sign
+                pyg.CalcOct = -pyg.CalcOct
                 pyg.mask = torch.as_tensor([1, 1, 1, 1, 1, 1]).bool().view(1, -1)
             else:
                 for key in PROPS:
                     setattr(pyg, key, torch.as_tensor([9999.]))
-                setattr(pyg, "CalcSol", torch.as_tensor([df1.loc[sample_id]["activity"]]))
+                setattr(pyg, "CalcSol", torch.as_tensor([freesolv_df.loc[sample_id]["activity"]]))
                 pyg.mask = torch.as_tensor([0, 0, 0, 1, 0, 0]).bool().view(1, -1)
+            pyg.freesolv_sample_id = sample_id
 
             data_list.append(pyg)
         except Exception as e:
@@ -92,11 +96,12 @@ def mask_mt_pyg_gen():
             pyg = torch.load(pyg_f)
 
             sample_id = int(osp.basename(pyg_f).split(".")[0])
-            if sample_id not in ids_2:
+            if sample_id not in physprop_id_intersection:
                 for key in PROPS:
                     setattr(pyg, key, torch.as_tensor([9999.]))
-                setattr(pyg, "watOct", torch.as_tensor([df2.loc[sample_id]["activity"] * logP_to_watOct]))
+                setattr(pyg, "watOct", torch.as_tensor([physprop_df.loc[sample_id]["activity"] * logP_to_watOct]))
                 pyg.mask = torch.as_tensor([0, 0, 0, 0, 0, 1]).bool().view(1, -1)
+                pyg.freesolv_sample_id = -1
                 data_list.append(pyg)
         except Exception as e:
             print(f"Error processing {pyg_f}: {e}")
