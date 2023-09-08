@@ -77,7 +77,7 @@ Train a ensemble of 5 models from scratch on the calculated dataset.
 
 `bash bash_scripts/train_ens_from_config.bash configs/config-frag20sol.txt`
 
-### 2. Train sPhysNet-MT on the experimental dataset (FreeSolv-PHYSPROP-14k)
+### 3. Train sPhysNet-MT on the experimental dataset (FreeSolv-PHYSPROP-14k)
 
 Fine-tune the pretrained model on FreeSolv-PHYSPROP-14k using 50 random splits and 5 ensembles.
 
