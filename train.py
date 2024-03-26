@@ -148,7 +148,7 @@ def data_provider_solver(name_full, _kw_args):
         raise ValueError('Unrecognized dataset name: {} !'.format(name_base))
 
 
-def train_step(model, _optimizer, data_batch, loss_fn, max_norm, warm_up_scheduler, config_dict):
+def train_step(model, _optimizer, data_batch, loss_fn, max_norm, scheduler, config_dict):
     if torch.cuda.is_available():
         torch.cuda.synchronize()
     t0 = time.time()
@@ -174,7 +174,7 @@ def train_step(model, _optimizer, data_batch, loss_fn, max_norm, warm_up_schedul
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
     _optimizer.step()
     if config_dict["scheduler_base"] in tags.step_per_step:
-        warm_up_scheduler.step()
+        scheduler.step()
 
     if config_dict["time_debug"]:
         t0 = record_data('step', t0, True)
@@ -267,42 +267,21 @@ def val_step_new(model, _data_loader, loss_fn, diff=False, lightweight=True, con
 def train(config_dict=None, data_provider=None, explicit_split=None, ignore_valid=False, use_tqdm=False):
     # ------------------- variable set up ---------------------- #
     config_dict = preprocess_config(config_dict)
-    # assert config_dict["requires_atom_embedding"]
-    # assert config_dict["lin_last"], "Comment this line in train.py if you know what you are doing :-) "
-
-    # record run time of programs
-    if config_dict["time_debug"]:
-        assert not config_dict["is_dist"]
-    t0 = time.time()
-
-    local_rank = config_dict["local_rank"]
-    is_main: bool = (local_rank == 0)
-    if torch.cuda.is_available() and config_dict["is_dist"]:
-        torch.cuda.set_device(local_rank)
-        # ---------------- Distributed Training ------------------- #
-        print("start init..., gpu = ", local_rank)
-        dist.init_process_group(backend='nccl', init_method='env://')
-        print("end init..., gpu = ", local_rank)
 
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
     if data_provider is None:
         data_provider = dataset_from_args(config_dict, logger)
-    if is_main:
-        logger.info("used dataset: {}".format(data_provider.processed_file_names))
+    logger.info("used dataset: {}".format(data_provider.processed_file_names))
 
     # ----------------- set up run directory -------------------- #
-    if is_main:
-        if config_dict["chk"] is None:
-            folder_prefix = config_dict["folder_prefix"]
-            tmp = osp.basename(folder_prefix)
-            run_directory = non_collapsing_folder(folder_prefix)
-            shutil.copyfile(config_dict["config_name"], osp.join(run_directory, f"config-{tmp}.txt"))
-            with open(osp.join(run_directory, "config_runtime.json"), "w") as out:
-                json.dump(config_dict, out, skipkeys=True, indent=4, default=lambda x: None)
-        else:
-            run_directory = config_dict["chk"]
+    folder_prefix = config_dict["folder_prefix"]
+    tmp = osp.basename(folder_prefix)
+    run_directory = non_collapsing_folder(folder_prefix)
+    shutil.copyfile(config_dict["config_name"], osp.join(run_directory, f"config-{tmp}.txt"))
+    with open(osp.join(run_directory, "config_runtime.json"), "w") as out:
+        json.dump(config_dict, out, skipkeys=True, indent=4, default=lambda x: None)
 
         # --------------------- Logger setup ---------------------------- #
         # first we want to remove previous logger step up by other programs
@@ -318,73 +297,41 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
         print("run dir: {}".format(run_directory))
 
     # -------------- Index file and remove specific atoms ------------ #
-    if explicit_split is not None:
-        if is_main:
-            torch.save(explicit_split, osp.join(run_directory, "runtime_split.pt"))
-        if isinstance(explicit_split, tuple):
-            train_index, val_index, test_index = explicit_split
-        elif isinstance(explicit_split, dict):
-            train_index, val_index, test_index = explicit_split["train_index"], explicit_split["valid_index"], \
-                                                 explicit_split["test_index"]
-        else:
-            raise ValueError(f"cannot understand split: {explicit_split}")
-    else:
-        train_index, val_index, test_index = data_provider.train_index, data_provider.val_index, data_provider.test_index
-        if len(config_dict["remove_atom_ids"]) > 0 and config_dict["remove_atom_ids"][0] > 0:
-            # remove B atom from dataset
-            train_index, val_index, test_index = rm_atom(
-                config_dict["remove_atom_ids"], data_provider, remove_split=('train', 'valid'),
-                explicit_split=(train_index, val_index, test_index))
-        if is_main:
-            logger.info('REMOVING ATOM {} FROM DATASET'.format(config_dict["remove_atom_ids"]))
-            print('REMOVING ATOM {} FROM DATASET'.format(config_dict["remove_atom_ids"]))
+    train_index, val_index, test_index = data_provider.train_index, data_provider.val_index, data_provider.test_index
 
     if config_dict["debug_mode"]:
         train_index = train_index[:1000]
-        if is_main:
-            logger.warning("***********DEBUG MODE ON, Result not trustworthy***************")
+        logger.warning("***********DEBUG MODE ON, Result not trustworthy***************")
     train_size, val_size, test_size = validate_index(train_index, val_index, test_index)
-    if is_main:
-        logger.info(f"train size: {train_size}")
-        logger.info(f"validation size: {val_size}")
-        logger.info(f"test size: {test_size}")
+    logger.info(f"train size: {train_size}")
+    logger.info(f"validation size: {val_size}")
+    logger.info(f"test size: {test_size}")
 
-    # num_workers = os.cpu_count()
-    # TODO: Distributed training num_worker problems...
-    if config_dict["is_dist"]:
-        num_workers = 0
-    else:
-        n_cpu_avail = len(os.sched_getaffinity(0))
-        n_cpu = os.cpu_count()
-        # screw it, the num_workers is really problematic, causing deadlocks
-        num_workers = 0
-        logger.info(f"Number of total CPU: {n_cpu}")
-        logger.info(f"Number of available CPU: {n_cpu_avail}")
-    # logger.info("Using {} cpus, therefore num_workers={}".format(os.cpu_count(), num_workers))
-    if torch.cuda.is_available() and config_dict["is_dist"]:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(
-            data_provider[torch.as_tensor(train_index)], shuffle=True)
-        loader_kw_args = {"sampler": train_sampler}
-    else:
-        loader_kw_args = {"shuffle": True, "batch_size": config_dict["batch_size"]}
-        if config_dict["over_sample"]:
-            has_solv_mask = data_provider.data.mask[torch.as_tensor(train_index), 3]
-            n_total = has_solv_mask.shape[0]
-            n_has_wat_solv = has_solv_mask.sum().item()
-            n_no_wat_solv = n_total - n_has_wat_solv
-            logger.info(f"Oversampling: {n_total} molecules are in the training set")
-            logger.info(f"Oversampling: {n_has_wat_solv} molecules has water solv")
-            logger.info(f"Oversampling: {n_no_wat_solv} molecules do not have water solv")
-            weights = torch.zeros_like(has_solv_mask).float()
-            weights[has_solv_mask] = n_no_wat_solv
-            weights[~has_solv_mask] = n_has_wat_solv
-            sampler = WeightedRandomSampler(weights=weights, num_samples=n_total)
-            loader_kw_args["sampler"] = sampler
-            loader_kw_args["shuffle"] = False
+    n_cpu_avail = len(os.sched_getaffinity(0))
+    n_cpu = os.cpu_count()
+    # screw it, the num_workers is really problematic, causing deadlocks
+    num_workers = 0
+    logger.info(f"Number of total CPU: {n_cpu}")
+    logger.info(f"Number of available CPU: {n_cpu_avail}")
 
+    # dataloader
+    loader_kw_args = {"shuffle": True, "batch_size": config_dict["batch_size"]}
+    if config_dict["over_sample"]:
+        has_solv_mask = data_provider.data.mask[torch.as_tensor(train_index), 3]
+        n_total = has_solv_mask.shape[0]
+        n_has_wat_solv = has_solv_mask.sum().item()
+        n_no_wat_solv = n_total - n_has_wat_solv
+        logger.info(f"Oversampling: {n_total} molecules are in the training set")
+        logger.info(f"Oversampling: {n_has_wat_solv} molecules has water solv")
+        logger.info(f"Oversampling: {n_no_wat_solv} molecules do not have water solv")
+        weights = torch.zeros_like(has_solv_mask).float()
+        weights[has_solv_mask] = n_no_wat_solv
+        weights[~has_solv_mask] = n_has_wat_solv
+        sampler = WeightedRandomSampler(weights=weights, num_samples=n_total)
+        loader_kw_args["sampler"] = sampler
+        loader_kw_args["shuffle"] = False
     train_data_loader = torch.utils.data.DataLoader(
         data_provider[torch.as_tensor(train_index)], collate_fn=collate_fn, pin_memory=True, num_workers=num_workers, **loader_kw_args)
-
     val_data_loader = torch.utils.data.DataLoader(
         data_provider[torch.as_tensor(val_index)], batch_size=config_dict["valid_batch_size"], collate_fn=collate_fn,
         pin_memory=True, shuffle=False, num_workers=num_workers)
@@ -395,58 +342,32 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
 
     # ------------------- Setting up model and optimizer ------------------ #
     # Normalization of PhysNet atom-wise prediction
-    if config_dict["action"] == "E":
-        mean_atom, std_atom = atom_mean_std(getattr(data_provider.data, config_dict["action"]),
-                                            data_provider.data.N, train_index)
-        mean_atom = mean_atom.item()
-    elif config_dict["action"] in ["names", "names_and_QD"]:
-        mean_atom = []
-        std_atom = []
-        for name in config_dict["target_names"]:
-            this_mean, this_std = atom_mean_std(getattr(data_provider.data, name), data_provider.data.N, train_index)
-            mean_atom.append(this_mean)
-            std_atom.append(this_std)
-        if config_dict["action"] == "names_and_QD":
-            # the last dimension is for predicting atomic charge
-            mean_atom.append(0.)
-            std_atom.append(1.)
-        mean_atom = torch.as_tensor(mean_atom)
-        std_atom = torch.as_tensor(std_atom)
-    elif config_dict["action"] == "names_atomic":
-        mean_atom = []
-        std_atom = []
-        for name in config_dict["target_names"]:
-            this_atom_prop: torch.Tensor = getattr(data_provider.data, name)
-            mean_atom.append(torch.mean(this_atom_prop.double()).item())
-            std_atom.append(torch.std(this_atom_prop.double()).item())
-        mean_atom = torch.as_tensor(mean_atom)
-        std_atom = torch.as_tensor(std_atom)
-    elif config_dict["action"] == "solubility":
-        raise NotImplemented
-    else:
-        raise ValueError("Invalid action: {}".format(config_dict["action"]))
+    assert config_dict["action"] in ["names", "names_and_QD"], config_dict["action"]
+    mean_atom = []
+    std_atom = []
+    for name in config_dict["target_names"]:
+        this_mean, this_std = atom_mean_std(getattr(data_provider.data, name), data_provider.data.N, train_index)
+        mean_atom.append(this_mean)
+        std_atom.append(this_std)
+    if config_dict["action"] == "names_and_QD":
+        # the last dimension is for predicting atomic charge
+        mean_atom.append(0.)
+        std_atom.append(1.)
+    mean_atom = torch.as_tensor(mean_atom)
+    std_atom = torch.as_tensor(std_atom)
+
     E_atomic_scale = std_atom
     E_atomic_shift = mean_atom
 
     config_dict['energy_shift'] = E_atomic_shift
     config_dict['energy_scale'] = E_atomic_scale
 
-    if config_dict["ext_atom_features"] is not None:
-        # infer the dimension of external atom feature
-        ext_atom_feature = getattr(data_provider[[0]].data, config_dict["ext_atom_features"])
-        ext_atom_dim = ext_atom_feature.shape[-1]
-        config_dict["ext_atom_dim"] = ext_atom_dim
-        del ext_atom_feature
 
     net = PhysDimeNet(**config_dict)
     net = net.to(get_device())
     net = net.type(floating_type)
 
-    if config_dict["use_swag"]:
-        dummy_model = PhysDimeNet(**config_dict).to(get_device()).type(floating_type)
-        swag_model = SWAG(dummy_model, no_cov_mat=False, max_num_models=20)
-    else:
-        swag_model = None
+    swag_model = None
 
     # model freeze options (transfer learning)
     if config_dict["freeze_option"] == 'prev':
@@ -459,17 +380,14 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
         raise ValueError('Invalid freeze option: {}'.format(config_dict["freeze_option"]))
 
     # ---------------------- restore pretrained model ------------------------ #
-    if config_dict["use_trained_model"] or config_dict["chk"]:
-        if config_dict["chk"]:
-            model_chk = config_dict["chk"]
-        else:
-            model_chk = config_dict["use_trained_model"]
+    if config_dict["use_trained_model"]:
+        model_chk = config_dict["use_trained_model"]
         trained_model_dir = glob.glob(model_chk)
         assert len(trained_model_dir) == 1, f"Zero or multiple trained folder: {trained_model_dir}"
         trained_model_dir = trained_model_dir[0]
         config_dict["use_trained_model"] = trained_model_dir
-        if is_main:
-            logger.info('using trained model: {}'.format(trained_model_dir))
+        logger.info('using trained model: {}'.format(trained_model_dir))
+        
         train_model_path = osp.join(trained_model_dir, 'training_model.pt')
         if not osp.exists(train_model_path):
             train_model_path = osp.join(trained_model_dir, 'best_model.pt')
@@ -481,9 +399,9 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
             state_dict = process_state_dict(state_dict, config_dict, logger, is_main)
 
             incompatible_keys = _net.load_state_dict(state_dict=state_dict, strict=False)
-            if is_main:
-                logger.info(f"---------vvvvv incompatible keys in {_model_path} vvvvv---------")
-                logger.info(str(incompatible_keys))
+
+            logger.info(f"---------vvvvv incompatible keys in {_model_path} vvvvv---------")
+            logger.info(str(incompatible_keys))
         shadow_dict = torch.load(best_model_path, map_location=get_device())
         shadow_dict = process_state_dict(fix_model_keys(shadow_dict), config_dict, logger, is_main)
     else:
@@ -491,16 +409,10 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
 
     # optimizers
     ema_decay = config_dict["ema_decay"]
-    if config_dict["optimizer"].split('_')[0] == 'emaAms':
-        # for some reason I created two ways of specifying EMA decay...
-        # for compatibility, I will keep both
-        assert float(config_dict["optimizer"].split('_')[1]) == ema_decay
-        optimizer = EmaAmsGrad(net, lr=config_dict["learning_rate"], ema=float(config_dict["optimizer"].split('_')[1]),
-                               shadow_dict=shadow_dict)
-    elif config_dict["optimizer"].split('_')[0] == 'sgd':
-        optimizer = MySGD(net, lr=config_dict["learning_rate"])
-    else:
-        raise ValueError('Unrecognized optimizer: {}'.format(config_dict["optimizer"]))
+    assert config_dict["optimizer"].split('_')[0] == 'emaAms', config_dict["optimizer"]
+    assert float(config_dict["optimizer"].split('_')[1]) == ema_decay
+    optimizer = EmaAmsGrad(net, lr=config_dict["learning_rate"], ema=float(config_dict["optimizer"].split('_')[1]),
+                            shadow_dict=shadow_dict)
 
     # schedulers
     scheduler_kw_args = option_solver(config_dict["scheduler"], type_conversion=True)
@@ -519,13 +431,6 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
     else:
         raise ValueError('Unrecognized scheduler: {}'.format(config_dict["scheduler"]))
 
-    if config_dict["warm_up_steps"] > 0:
-        from warmup_scheduler import GradualWarmupScheduler
-        warm_up_scheduler = GradualWarmupScheduler(optimizer, multiplier=1.0, total_epoch=config_dict["warm_up_steps"],
-                                                   after_scheduler=scheduler)
-    else:
-        warm_up_scheduler = scheduler
-
     if config_dict["use_trained_model"] and (not config_dict["reset_optimizer"]):
         if os.path.exists(os.path.join(trained_model_dir, "best_model_optimizer.pt")):
             optimizer.load_state_dict(torch.load(os.path.join(trained_model_dir, "best_model_optimizer.pt"),
@@ -542,85 +447,66 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
         ft_protection = min(30, ft_protection)
     else:
         ft_protection = 0
-    if is_main:
-        logger.info(f"Fine tune protection: {ft_protection} epochs. ")
+    logger.info(f"Fine tune protection: {ft_protection} epochs. ")
 
     # --------------------- Printing meta data ---------------------- #
     if get_device().type == 'cuda':
         logger.info('Hello from device : ' + torch.cuda.get_device_name(get_device()))
         logger.info("Cuda mem allocated: {:.2f} MB".format(torch.cuda.memory_allocated(get_device()) * 1e-6))
 
-    if is_main:
-        with open(meta_data_name, 'w+') as f:
-            n_parm, model_structure = get_n_params(net, None, False)
-            logger.info('model params: {}'.format(n_parm))
-            f.write('*' * 20 + '\n')
-            f.write("all params\n")
-            f.write(model_structure)
-            f.write('*' * 20 + '\n')
-            n_parm, model_structure = get_n_params(net, None, True)
-            logger.info('trainable params: {}'.format(n_parm))
-            f.write('*' * 20 + '\n')
-            f.write("trainable params\n")
-            f.write(model_structure)
-            f.write('*' * 20 + '\n')
-            f.write('train data index:{} ...\n'.format(train_index[:100]))
-            f.write('val data index:{} ...\n'.format(val_index[:100]))
-            # f.write('test data index:{} ...\n'.format(test_index[:100]))
-            for _key in config_dict.keys():
-                f.write("{} = {}\n".format(_key, config_dict[_key]))
-
-    # ---------------------- Final steps before training ----------------- #
-    if torch.cuda.is_available() and config_dict["is_dist"]:
-        # There we go, distributed training!!!
-        net.cuda(local_rank)
-        net = DDP(net, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
+    with open(meta_data_name, 'w+') as f:
+        n_parm, model_structure = get_n_params(net, None, False)
+        logger.info('model params: {}'.format(n_parm))
+        f.write('*' * 20 + '\n')
+        f.write("all params\n")
+        f.write(model_structure)
+        f.write('*' * 20 + '\n')
+        n_parm, model_structure = get_n_params(net, None, True)
+        logger.info('trainable params: {}'.format(n_parm))
+        f.write('*' * 20 + '\n')
+        f.write("trainable params\n")
+        f.write(model_structure)
+        f.write('*' * 20 + '\n')
+        f.write('train data index:{} ...\n'.format(train_index[:100]))
+        f.write('val data index:{} ...\n'.format(val_index[:100]))
+        # f.write('test data index:{} ...\n'.format(test_index[:100]))
+        for _key in config_dict.keys():
+            f.write("{} = {}\n".format(_key, config_dict[_key]))
 
     # ---------------------- Training ----------------------- #
-    if is_main:
-        logger.info('start training...')
+    logger.info('start training...')
 
     shadow_net = optimizer.shadow_model
     val_res = val_step_new(shadow_net, val_data_loader, loss_fn)
 
-    if is_main:
-        # csv files recording all loss info
-        csv_f = osp.join(run_directory, "loss_data.csv")
-        if osp.exists(csv_f):
-            loss_df = pd.read_csv(csv_f)
-        else:
-            loss_df = pd.DataFrame()
-            this_df_dict = OrderedDict(
-                {"epoch": 0, "train_loss": -1, "valid_loss": val_res["loss"], "delta_time": time.time() - t0})
-            for key in val_res.keys():
-                if key != "loss" and not isinstance(val_res[key], torch.Tensor):
-                    this_df_dict[key] = val_res[key]
-                    this_df_dict.move_to_end(key)
-            loss_df = loss_df.append(this_df_dict, ignore_index=True)
-        loss_df.to_csv(csv_f, index=False)
+    # csv files recording all loss info
+    csv_f = osp.join(run_directory, "loss_data.csv")
+    if osp.exists(csv_f):
+        loss_df = pd.read_csv(csv_f)
+    else:
+        loss_df = pd.DataFrame()
+        this_df_dict = OrderedDict(
+            {"epoch": 0, "train_loss": -1, "valid_loss": val_res["loss"], "delta_time": time.time() - t0})
+        for key in val_res.keys():
+            if key != "loss" and not isinstance(val_res[key], torch.Tensor):
+                this_df_dict[key] = val_res[key]
+                this_df_dict.move_to_end(key)
+        loss_df = loss_df.append(this_df_dict, ignore_index=True)
+    loss_df.to_csv(csv_f, index=False)
 
     # use np.inf instead of val_res["loss"] for proper transfer learning behaviour
     best_loss = np.inf
 
-    if is_main:
-        last_epoch = pd.read_csv(osp.join(run_directory, "loss_data.csv"), header="infer").iloc[-1]["epoch"]
-        last_epoch = int(last_epoch.item())
-        logger.info('Init lr: {}'.format(get_lr(optimizer)))
-    else:
-        last_epoch = 0
+    last_epoch = pd.read_csv(osp.join(run_directory, "loss_data.csv"), header="infer").iloc[-1]["epoch"]
+    last_epoch = int(last_epoch.item())
+    logger.info('Init lr: {}'.format(get_lr(optimizer)))
 
     early_stop_count = 0
     step = 0
 
-    if config_dict["time_debug"]:
-        t0 = record_data("setup", t0)
-
     logger.info("Setup complete, training starts...")
 
     for epoch in range(last_epoch, last_epoch + config_dict["num_epochs"]):
-        # let all processes sync up before starting with a new epoch of training
-        if torch.cuda.is_available() and config_dict["is_dist"]:
-            dist.barrier()
 
         # Early stop when learning rate is too low
         this_lr = get_lr(optimizer)
@@ -638,57 +524,40 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
             this_size = data.N.shape[0]
 
             train_loss += train_step(net, _optimizer=optimizer, data_batch=data, loss_fn=loss_fn,
-                                     max_norm=config_dict["max_norm"], warm_up_scheduler=warm_up_scheduler,
+                                     max_norm=config_dict["max_norm"], scheduler=scheduler,
                                      config_dict=config_dict) * this_size / train_size
             step += 1
 
         # ---------------------- Post training steps: validation, save model, print meta ---------------- #
-        if is_main:
-            logger.info('epoch {} ended, learning rate: {} '.format(epoch, this_lr))
-            shadow_net = optimizer.shadow_model
-            val_res = val_step_new(shadow_net, val_data_loader, loss_fn)
-            if config_dict["scheduler_base"] in tags.step_per_epoch and (epoch - last_epoch) >= ft_protection:
-                warm_up_scheduler.step(metrics=val_res["loss"])
+        logger.info('epoch {} ended, learning rate: {} '.format(epoch, this_lr))
+        shadow_net = optimizer.shadow_model
+        val_res = val_step_new(shadow_net, val_data_loader, loss_fn)
+        if config_dict["scheduler_base"] in tags.step_per_epoch and (epoch - last_epoch) >= ft_protection:
+            scheduler.step(metrics=val_res["loss"])
 
-            # _loss_data_this_epoch = {'epoch': epoch, 't_loss': train_loss, 'v_loss': val_res['loss'],
-            #                          'time': time.time()}
-            # _loss_data_this_epoch.update(val_res)
-            # loss_data.append(_loss_data_this_epoch)
-            # torch.save(loss_data, os.path.join(run_directory, 'loss_data.pt'))
+        this_df_dict = {"epoch": epoch, "train_loss": train_loss.cpu().item(), "valid_loss": val_res["loss"],
+                        "delta_time": time.time() - t0}
+        for key in val_res.keys():
+            if key != "loss" and not isinstance(val_res[key], torch.Tensor):
+                this_df_dict[key] = val_res[key]
 
-            this_df_dict = {"epoch": epoch, "train_loss": train_loss.cpu().item(), "valid_loss": val_res["loss"],
-                            "delta_time": time.time() - t0}
-            for key in val_res.keys():
-                if key != "loss" and not isinstance(val_res[key], torch.Tensor):
-                    this_df_dict[key] = val_res[key]
-            t0 = time.time()
-            loss_df = loss_df.append(this_df_dict, ignore_index=True)
-            loss_df.to_csv(csv_f, index=False)
+        loss_df = loss_df.append(this_df_dict, ignore_index=True)
+        loss_df.to_csv(csv_f, index=False)
 
-            if config_dict["use_swag"]:
-                start, freq = config_dict["uncertainty_modify"].split('_')[1], \
-                              config_dict["uncertainty_modify"].split('_')[2]
-                if epoch > int(start) and (epoch % int(freq) == 0):
-                    swag_model.collect_model(shadow_net)
-                    torch.save(swag_model.state_dict(), osp.join(run_directory, 'swag_model.pt'))
-            if ignore_valid or (val_res['loss'] < best_loss):
-                early_stop_count = 0
-                best_loss = val_res['loss']
-                torch.save(shadow_net.state_dict(), osp.join(run_directory, 'best_model.pt'))
-                torch.save(net.state_dict(), osp.join(run_directory, 'training_model.pt'))
-                torch.save(optimizer.state_dict(), osp.join(run_directory, 'best_model_optimizer.pt'))
-                torch.save(scheduler.state_dict(), osp.join(run_directory, "best_model_scheduler.pt"))
-            else:
-                early_stop_count += 1
-                if early_stop_count == config_dict["early_stop"]:
-                    logger.info('early stop at epoch {}.'.format(epoch))
-                    break
+        if ignore_valid or (val_res['loss'] < best_loss):
+            early_stop_count = 0
+            best_loss = val_res['loss']
+            torch.save(shadow_net.state_dict(), osp.join(run_directory, 'best_model.pt'))
+            torch.save(net.state_dict(), osp.join(run_directory, 'training_model.pt'))
+            torch.save(optimizer.state_dict(), osp.join(run_directory, 'best_model_optimizer.pt'))
+            torch.save(scheduler.state_dict(), osp.join(run_directory, "best_model_scheduler.pt"))
+        else:
+            early_stop_count += 1
+            if early_stop_count == config_dict["early_stop"]:
+                logger.info('early stop at epoch {}.'.format(epoch))
+                break
 
-    if is_main:
-        if config_dict["time_debug"]:
-            t0 = record_data("training", t0)
-            print_function_runtime(folder=run_directory)
-        remove_handler(logger)
+    remove_handler(logger)
     meta = {"run_directory": run_directory}
     return meta
 
