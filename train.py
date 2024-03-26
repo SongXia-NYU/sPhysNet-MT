@@ -367,8 +367,6 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
     net = net.to(get_device())
     net = net.type(floating_type)
 
-    swag_model = None
-
     # model freeze options (transfer learning)
     if config_dict["freeze_option"] == 'prev':
         net.freeze_prev_layers(freeze_extra=False)
@@ -396,14 +394,14 @@ def train(config_dict=None, data_provider=None, explicit_split=None, ignore_vali
         for _net, _model_path in zip([net], [train_model_path]):
             state_dict = torch.load(_model_path, map_location=get_device())
             state_dict = fix_model_keys(state_dict)
-            state_dict = process_state_dict(state_dict, config_dict, logger, is_main)
+            state_dict = process_state_dict(state_dict, config_dict, logger)
 
             incompatible_keys = _net.load_state_dict(state_dict=state_dict, strict=False)
 
             logger.info(f"---------vvvvv incompatible keys in {_model_path} vvvvv---------")
             logger.info(str(incompatible_keys))
         shadow_dict = torch.load(best_model_path, map_location=get_device())
-        shadow_dict = process_state_dict(fix_model_keys(shadow_dict), config_dict, logger, is_main)
+        shadow_dict = process_state_dict(fix_model_keys(shadow_dict), config_dict, logger)
     else:
         shadow_dict = None
 

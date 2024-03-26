@@ -886,7 +886,7 @@ def fix_model_keys(state_dict):
     return tmp
 
 
-def process_state_dict(state_dict, config_dict, logger, is_main):
+def process_state_dict(state_dict, config_dict, logger):
     if config_dict["reset_output_layers"] or config_dict["reset_scale_shift"]:
         # OrderedDict is immutable so I have to make a copy
         new_state_dict = OrderedDict()
@@ -907,8 +907,7 @@ def process_state_dict(state_dict, config_dict, logger, is_main):
             for reg in reset_list:
                 if reg.fullmatch(key) is not None:
                     keep = False
-                    if is_main:
-                        logger.info(f"discarding: {key}")
+                    logger.info(f"discarding: {key}")
                     break
             if keep:
                 new_state_dict[key] = state_dict[key]
