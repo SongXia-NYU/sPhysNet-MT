@@ -90,62 +90,10 @@ def data_provider_solver(name_full, _kw_args):
         _kw_args[key] = additional_kwargs[key]
 
     assert name_base == "dummy", "All name_bases except 'dummy' are disabled"
-    if name_base == 'qm9':
-        from qm9InMemoryDataset import Qm9InMemoryDataset
-        return Qm9InMemoryDataset, _kw_args
-    elif name_base.split('_')[0] == 'frag20nHeavy':
-        from Frag20IMDataset import Frag20IMDataset
-        print("Deprecated dataset: {}".format(name_base))
-        n_heavy_atom = int(name_base[7:])
-        _kw_args['n_heavy_atom'] = n_heavy_atom
-        return Frag20IMDataset, _kw_args
-    elif name_base[:9] == 'frag9to20':
-        from Frag9to20MixIMDataset import Frag9to20MixIMDataset, uniform_split, small_split, large_split
-        _kw_args['training_option'] = 'train'
-        split = name_base[10:]
-        if split == 'uniform':
-            _kw_args['split_settings'] = uniform_split
-        elif split == 'small':
-            _kw_args['split_settings'] = small_split
-        elif split == 'large':
-            _kw_args['split_settings'] = large_split
-        elif split == 'all':
-            _kw_args['split_settings'] = uniform_split
-            _kw_args['all_data'] = True
-        elif split == 'jianing':
-            _kw_args['split_settings'] = uniform_split
-            _kw_args['jianing_split'] = True
-            _kw_args["all_data"] = False
-        else:
-            raise ValueError('not recognized argument: {}'.format(split))
-        return Frag9to20MixIMDataset, _kw_args
-    elif name_base in ['frag20_eMol9_combine', 'frag20_eMol9_combine_MMFF']:
-        from PhysDimeIMDataset import PhysDimeIMDataset
-        from CombinedIMDataset import CombinedIMDataset
-        geometry = "MMFF" if name_base == 'frag20_eMol9_combine_MMFF' else "QM"
-        frag20dataset, tmp_args = data_provider_solver('frag9to20_all', _kw_args)
-        frag20dataset = frag20dataset(**tmp_args, geometry=geometry)
-        len_frag20 = len(frag20dataset)
-        val_index = frag20dataset.val_index
-        train_index = frag20dataset.train_index
-        _kw_args['dataset_name'] = 'frag20_eMol9_combined_{}.pt'.format(geometry)
-        _kw_args['val_index'] = val_index
-        e_mol9_dataset = PhysDimeIMDataset(root=tmp_args['root'], processed_prefix='eMol9_{}'.format(geometry),
-                                           pre_transform=my_pre_transform,
-                                           record_long_range=tmp_args['record_long_range'],
-                                           infile_dic={
-                                               'PhysNet': 'eMol9_PhysNet_{}.npz'.format(geometry),
-                                               'SDF': 'eMol9_{}.pt'.format(geometry)})
-        len_e9 = len(e_mol9_dataset)
-        _kw_args['train_index'] = torch.cat([train_index, torch.arange(len_frag20, len_e9 + len_frag20)])
-        _kw_args['dataset_list'] = [frag20dataset, e_mol9_dataset]
-        return CombinedIMDataset, _kw_args
-    elif name_base == "dummy":
-        assert "dataset_name", "split" in additional_kwargs
-        _kw_args.update(additional_kwargs)
-        return DummyIMDataset, _kw_args
-    else:
-        raise ValueError('Unrecognized dataset name: {} !'.format(name_base))
+    assert "dataset_name", "split" in additional_kwargs
+    _kw_args.update(additional_kwargs)
+    return DummyIMDataset, _kw_args
+
 
 
 def train_step(model, _optimizer, data_batch, loss_fn, max_norm, scheduler, config_dict):

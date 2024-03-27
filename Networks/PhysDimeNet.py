@@ -381,14 +381,6 @@ class PhysDimeNet(nn.Module):
             edge_index = getattr(data, bonding_str_raw + '_edge_index', False)
             if edge_index is not False:
                 edge_index_getter[bonding_str] = edge_index + getattr(data, bonding_str_raw + '_edge_index_correct')
-            elif len(bonding_str) > 4 and bonding_str[-4:] == "-ext":
-                # calculate 1,3 interaction on the fly
-                b4_ext = bonding_str.split('-')[0]
-                if b4_ext in edge_index_getter.keys():
-                    b4_ext_index = edge_index_getter[b4_ext]
-                else:
-                    b4_ext_index = data[b4_ext + '_edge_index'] + data[b4_ext + '_edge_index_correct']
-                edge_index_getter[bonding_str] = extend_bond(b4_ext_index)
             else:
                 edge_index_getter[bonding_str] = torch.cat(
                     [data[_type + '_edge_index'] + data[_type + '_edge_index_correct'] for _type in bonding_str],
@@ -396,16 +388,6 @@ class PhysDimeNet(nn.Module):
 
         if self.time_debug:
             t0 = record_data("bond_setup", t0)
-
-        msg_edge_index_getter = {}
-        for bonding_str in self.msg_bond_type:
-            # prepare msg edge index
-            this_msg_edge_index = getattr(data, bonding_str + '_msg_edge_index', False)
-            if this_msg_edge_index is not False:
-                msg_edge_index_getter[bonding_str] = this_msg_edge_index + \
-                                                     getattr(data, bonding_str + '_msg_edge_index_correct')
-            else:
-                msg_edge_index_getter[bonding_str] = cal_msg_edge_index(edge_index_getter[bonding_str]).to(get_device())
 
         if self.time_debug:
             t0 = record_data("msg_bond_setup", t0)
@@ -418,21 +400,7 @@ class PhysDimeNet(nn.Module):
             module_str = combination.split('_')[0]
             this_bond = combination.split('_')[1]
             this_expansion = self.expansion_info_getter[combination]['name']
-            if module_str in ['D', 'D-noOut']:
-                # DimeNet, calculate sbf and rbf
-                if this_expansion == "defaultDime":
-                    n_srbf = self.expansion_info_getter[combination]['n_srbf']
-                    n_shbf = self.expansion_info_getter[combination]['n_shbf']
-                    expansions[combination] = dime_edge_expansion(R, edge_index_getter[this_bond],
-                                                                  msg_edge_index_getter[this_bond],
-                                                                  self.expansion_info_getter[combination]['n'],
-                                                                  self.dist_calculator,
-                                                                  getattr(self, f"bessel_calculator_{n_srbf}_{n_shbf}"),
-                                                                  self.expansion_info_getter[combination]['dist'],
-                                                                  return_dict=True)
-                else:
-                    raise ValueError("Double check your expansion input!")
-            elif module_str in ['P', 'P-noOut']:
+            if module_str in ['P', 'P-noOut']:
                 # PhysNet, calculate rbf
                 if this_expansion == 'bessel':
                     this_edge_index = edge_index_getter[this_bond]
@@ -494,8 +462,6 @@ class PhysDimeNet(nn.Module):
             if not info["is_transition"]:
                 out_dict["edge_index"] = edge_index_getter[info["bonding_str"]]
                 out_dict["edge_attr"] = expansions[info["combine_str"]]
-            if info["module_str"].split("-")[0] == "D":
-                out_dict["msg_edge_index"] = msg_edge_index_getter[info["bonding_str"]]
 
             out_dict = _module(out_dict)
 
